@@ -86,7 +86,54 @@ private:
     bool add_content_length(int content_length);
     bool add_linger();
     bool add_blank_line();
-private:
+public:
+    //所有socket都被注册到同一个epoll内核事件表中，所以将epoll文件描述符设置为静态的
+    static int m_epollfd;
+    //统计用户数量
+    static int m_user_count;
 
+private:
+    //该http连接的socket和对方的socket地址
+    int m_sockfd;
+    sockaddr_in m_address;
+
+    //读缓冲区
+    char m_read_buf[READ_BUFFER_SIZE];
+    //标识读缓冲区已经读入的客户数据的最后一个字节的下一个位置
+    int m_read_idx;
+    //当前正在分析的字符在读缓冲区中的位置
+    int m_checked_idx;
+    //当前正在解析的行的起始位置
+    int m_start_line;
+    //写缓冲
+    char m_write_buf[WRITE_BUFFER_SIZE];
+    //写缓冲区中待发送的字节数
+    int m_write_idx;
+
+    //主状态机当前所处的状态
+    CHECK_STATE m_check_state;
+    //请求方法
+    METHOD m_method;
+
+    //客户请求的目标文件的完整路径,其内容等于doc_root+m_url,doc_root是网站根目录
+    char m_real_file[FILENAME_LEN];
+    //客户请求的目标文件的文件名
+    char *url;
+    //HTTP的版本号
+    char *m_version;
+    //主机名
+    char* m_host;
+    //HTTP请求的消息体的长度
+    int m_content_length;
+    //HTTP请求是否要求保持链接
+    bool m_linger;
+
+    //客户请求的目标文件被mmap映射到内存的起始位置
+    char *m_file_address;
+    //目标文件的状态，通过他们可以判断文件是否存在、是否为目录，是否可靠，并获取文件大小等信息。
+    struct stat m_file_stat;
+    //我们将采用writev来执行写操作，所以定义两个成员，m_iv_count表示被写的内存块的数量
+    struct iovec_m m_iv[2];
+    int m_iv_count;
 };
 
