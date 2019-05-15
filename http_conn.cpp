@@ -101,7 +101,88 @@ void http_conn::init()
 //从状态机
 http::conn::LINE_STATUS http_conn::parse_line()
 {
+    char temp;
+    for( ;m_checked_dix < m_read_idx; ++m_checked_idx )
+    {
+        temp = m_read_buf[ m_checked_idx ];
+        if( temp == '\r' )
+        {
+            if( ( m_checked_idx + 1 ) == m_read_idx )
+            {
+                return LINE_OPEN;
+            }
+            else if( m_read_buf[ m_checked_idx + 1 ] == '\n' )
+            {
+                m_read_buf[ m_checked_idx++ ] = '\0';
+                m_read_buf[ m_checked_idx++ ] = '\0';
+                return LINK_OK;
+            }
+            return LINE_BAD;
+        }
+        else if( temp == '\n' )
+        {
+            if( ( m_checked_idx > 1 ) && ( m_read_buf[ m_checked_idx - 1 ] == '\r' ) )
+            {
+                m_read_buf[ m_checked_idx-1 ] = '\0';
+                m_read_buf[ m_chedked_idx++ ] = '\0';
+                return LINE_OK;
+            }
+            return LINE_BAD;
+        }
+    }
+    return LINE_OPEN;
+}
 
+//循环读取客户数据，直到无数据可读或者对方关闭连接
+bool http_conn::read()
+{
+    if( m_read_idx >= READ_BUFFER_SIZE )
+    {
+        return false;
+    }
+
+    int bytes_read = 0;
+    while( true )
+    {
+        bytes_read = recv( m_sockfd, m_read_buf + m_read_idx, READ_BUFFER_SIZE - m_read_idx, 0 );
+
+        if(bytes_read == -1)
+        {
+            if( errno == EAGAIN || errno == EWOULDBLOCK )
+            {
+                break;
+            }
+            return false;
+        }
+        else if( bytes_read == 0 )
+        {
+            return false;
+        }
+
+        m_read_idx += bytes_read;
+    }
+    return true;
+}
+
+//解析HTTP请求行，获得请求方法、目标URL，以及HTTP版本号
+http_conn::HTTP_CODE http_conn:parse_request_line( char* text )
+{
+    m_url = strpbrk(text, "\t");
+    if( !m_url )
+    {
+        return BAD_REQUEST;
+    }
+    *m_url++ = '\0';
+
+    char *method = text;
+    if( strcasecmp(method, "GET") == 0 )
+    {
+        m_method = GET;
+    }
+    else
+    {
+        return BAD_REQUEST;
+    }
 }
 int main()
 {
