@@ -183,6 +183,139 @@ http_conn::HTTP_CODE http_conn:parse_request_line( char* text )
     {
         return BAD_REQUEST;
     }
+    m_url += strspn(m_url,"\t");
+    m_version = strpbrk(m_url,"\t");
+    if( !m_version )
+    {
+        return BAD_REQUEST;
+    }
+    *m_version++ = '\0';
+    m_version += strspn(m_version,"\t");
+    if( strcasecmp(m_version,"HTTP/1.1") != 0 )
+    {
+        return BAD_REQUEST;
+    }
+
+    if( strcasecmp(m_url,"http://",7) == 0 )
+    {
+        m_url +=7;
+        m_url =strchr(m_url,'/');
+    }
+    
+    if( !m_url || m_url[0] != '/' )
+    {
+        return BAD_REQUEST;
+    }
+
+    m_check_state = CHECK_STATE_HEADER;
+    return NO_REQUEST;
+}
+
+//解析HTTP请求的一个头部信息
+http_conn::HTTP_CODE http_conn::parse_headers(char* text)
+{
+    //如果遇到空行，表示头部字段解析完毕
+    if( text[0] == '\0' )
+    {
+        //如果HTTP请求有消息体，则还需要读取m_content_length字节
+        //的消息体，状态机转移到CHECK_STATE_CONTENT状态
+        if( m_content_length != 0 )
+        {
+            m_check_state = CHECK_STATE_CONTENT;
+            return NO_REQUEST;
+        }
+
+        //否则说明我们已经得到一个完整的HTTP请求
+        return GET_REQUEST;
+    }
+
+    //处理Connection头部字段
+    else if ( strcasecmp( text, "Connection:", 11 ) == 0)
+    {
+        text += 11;
+        text += strspn(text, "\t");
+        if( strcasecmp( text, "keep-alive" ) == 0 )
+        {
+            m_linger = true;
+        }
+    }
+    //处理Content-Length头部字段
+    else if( strcasecmp( text, "Content-Length:", 15 ) == 0 )
+    {
+        text +=15;
+        text +=strspn(text, "\t");
+        m_content_length = atol( text );
+    }
+    //处理Host头部字段
+    else if( strcasecmp( text, "Host:", 5 ) == 0 )
+    {
+        text += 5;
+        text += strspn( text,"\t" );
+        m_host = text;
+    }else{
+        printf("oop!unknow header %s\n", text);
+    }
+
+    return NO_REQUEST;
+}
+
+//没有真正解析HTTP请求的消息体，只是判断他是否被完整的读入了
+http_conn::HTTP_CODE http_conn::parse_content(char* text)
+{
+    if( m_read_idx >= (m_content_length + m_checked_idx) )
+    {
+        text[ m_content_length ] = '\0';
+        return GET_REQUEST;
+    }
+    return NO_REQUEST;
+}
+
+//主状态机
+http_conn::HTTP_CODE http_conn::process_read()
+{
+    LINE_STATUS line_status = LINE_OK;
+    HTTP_CODE ret = NO_REQUEST;
+    char *text = 0;
+
+    while(((m_check_state == CHECK_STATE_CONTENT) &&(line_status ==LINE_OK) ) || ((line_status == parse_line()) == LINE_OK))
+    {
+        text = get_line();
+        m_start_line = m_checked_idx;
+        printf("got 1 http line: %s\n", text);
+
+        switch( m_check_state )
+        {
+            case CHECK_STATE_REQUESTLINE:
+                ret = parse_request_line( text );
+                if( ret == BAD_REQUEST)
+                {
+                    return BAD_REQUEST;
+                }
+                break;
+            case CHECK_STATE_HEADER:
+                ret = parse_headers(text);
+                if( ret == BAD_REQUEST )
+                {
+                    return BAD_REQUEST;
+                }
+                else if( ret == GET_REQUEST )
+                {
+                    return do_request();
+                }
+                break;
+            case CHECK_STATE_CONTENT:
+                ret = parse_content(text);
+                if( ret == GET_REQUEST )
+                {
+                    return do_request();
+                }
+                line_status = LINE_OPEN;
+                break;
+            default:
+                return INTERNAL_ERROR;
+        }
+    }
+    return NO_REQUEST;
 }
 int main()
 {
