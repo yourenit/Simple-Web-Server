@@ -36,7 +36,7 @@ public:
     enum METHOD { GET = 0,POST, HEAD, PUT, DELETE, TRACE, OPTIONS, CONNECT, PATCH };
     //解析客户请求时，主状态机所处的状态
     //主状态机的两种可能状态：当前正在分析请求行，当前正在分析头部字段
-    enum CHECK_CODE { CHECK_STATE_REQUESTLINE = 0,CHECK_STATE_HEADER,CHECK_STATE_CONTENT};
+    enum CHECK_STATE { CHECK_STATE_REQUESTLINE = 0,CHECK_STATE_HEADER,CHECK_STATE_CONTENT};
     //服务器处理http请求的可能结果
     //NO_REQUEST表示请求不完整，需要继续获取数据；
     //GET_REQUEST表示获得一个完整的客户请求；
@@ -47,7 +47,7 @@ public:
     enum HTTP_CODE { NO_REQUEST, GET_REQUEST, BAD_REQUEST, NO_RESOURCE, FORBIDDEN_REQUEST, FILE_REQUEST,
                     INTERNAL_ERROR, CLOSED_CONNECTION};
     //从状态机的三种可能状态，即行的读取状态，分别表示、；读取到一个完整的行、行出错、和行数据尚且不完整
-    enum LINK_CODE { LINK_OK = 0,LINK_BAD, LINK_OPEN };
+    enum LINE_STATUS { LINK_OK = 0,LINK_BAD, LINK_OPEN };
 
 public:
     //初始化新接受的连接
@@ -133,7 +133,7 @@ private:
     //目标文件的状态，通过他们可以判断文件是否存在、是否为目录，是否可靠，并获取文件大小等信息。
     struct stat m_file_stat;
     //我们将采用writev来执行写操作，所以定义两个成员，m_iv_count表示被写的内存块的数量
-    struct iovec_m m_iv[2];
+    struct iovec m_iv[2];
     int m_iv_count;
 };
 

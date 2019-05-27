@@ -35,12 +35,12 @@ class locker
 public:
     //初始化互斥锁
     locker(){
-        if(pthread_init(&mutex,NULL) != 0)
-            throw std:exception();
+        if(pthread_mutex_init(&mutex,NULL) != 0)
+            throw std::exception();
     }
     //销毁互斥锁
     ~locker(){
-        pthread_destroy(&mutex);
+        pthread_mutex_destroy(&mutex);
     }
 
     //获取互斥锁
@@ -52,7 +52,7 @@ public:
         return pthread_mutex_unlock(&mutex) == 0;
     }
 private:
-    pthread_t mutex;
+    pthread_mutex_t mutex;
 };
 
 //封装条件变量
